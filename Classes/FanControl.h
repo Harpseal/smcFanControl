@@ -81,10 +81,16 @@
 	IBOutlet id faqText;
 	
 	IBOutlet id sliderCell;
+    IBOutlet id rpmCell;
 	
 	IBOutlet id sync;
 
 	IBOutlet id colorSelector;
+    
+    IBOutlet NSSlider* sliderUpdateInterval;
+    IBOutlet NSTextField* textUpdateInterval;
+    
+    IBOutlet NSButton* btnEnableControlMinSpeed;
 		
 	NSStatusItem *statusItem;
 	
@@ -135,6 +141,9 @@
 - (IBAction) changeMenu:(id)sender;
 - (IBAction)menuSelect:(id)sender;
 - (void)menuNeedsUpdate:(NSMenu*)menu;
+
+//enable control min speed checkedbox
+- (IBAction)enableMinSpeed:(id)sender;
 @end
 
 

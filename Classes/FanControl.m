@@ -154,10 +154,10 @@ NSUserDefaults *defaults;
             @NO,@"DonationMessageShown",
 			[NSArchiver archivedDataWithRootObject:[NSColor blackColor]],@"MenuColor",
 			favorites,@"Favorites",
+            @1.0,@"UpdateInterval",
+            @NO,@"EnableControlMinspeed",
 	nil]];
 	
-	
-
 	g_numFans = [smcWrapper get_fan_num];
 	s_menus=[[NSMutableArray alloc] init];
 	int i;
@@ -211,12 +211,13 @@ NSUserDefaults *defaults;
         [menu_image_alt setTemplate:YES];
     }
 
+    NSLog(@"EnableControlMinspeed %d",[[defaults objectForKey:@"EnableControlMinspeed"] boolValue]);
+    [btnEnableControlMinSpeed setState:[[defaults objectForKey:@"EnableControlMinspeed"] boolValue]?NSOnState:NSOffState];
+    [self enableMinSpeed:btnEnableControlMinSpeed];
+    
 	//add timer for reading to RunLoop
-	_readTimer = [NSTimer scheduledTimerWithTimeInterval:4.0 target:self selector:@selector(readFanData:) userInfo:nil repeats:YES];
-    if ([_readTimer respondsToSelector:@selector(setTolerance:)]) {
-        [_readTimer setTolerance:2.0];
-    }
-	[_readTimer fire];
+    [sliderUpdateInterval setFloatValue:[[defaults objectForKey:@"UpdateInterval"] floatValue]];
+    [self updateTimer];
     
 	//autoapply settings if valid
 	[self upgradeFavorites];
@@ -225,9 +226,33 @@ NSUserDefaults *defaults;
     [[NSUserDefaults standardUserDefaults] setValue:@([self isInAutoStart]) forKey:@"AutoStart"];
      NSUInteger numLaunches = [[[NSUserDefaults standardUserDefaults] objectForKey:@"NumLaunches"] integerValue];
     [[NSUserDefaults standardUserDefaults] setObject:@(numLaunches+1) forKey:@"NumLaunches"];
-    if (numLaunches != 0 && (numLaunches % 5 == 0) && ![[[NSUserDefaults standardUserDefaults] objectForKey:@"DonationMessageShown"] boolValue]) {
-        [self displayDonationMessage];
+    //if (numLaunches != 0 && (numLaunches % 5 == 0) && ![[[NSUserDefaults standardUserDefaults] objectForKey:@"DonationMessageShown"] boolValue]) {
+    //    [self displayDonationMessage];
+    //}
+}
+
+-(void)updateTimer
+{
+    if (_readTimer != nil)
+    {
+        [_readTimer invalidate];
+        _readTimer = nil;
     }
+    [textUpdateInterval setStringValue:[NSString stringWithFormat:@"%.1f s",[sliderUpdateInterval floatValue]]];
+    //NSLog(@"Update interval %.2f sec",[sliderUpdateInterval floatValue] );
+    _readTimer = [NSTimer scheduledTimerWithTimeInterval:[sliderUpdateInterval floatValue] target:self selector:@selector(readFanData:) userInfo:nil repeats:YES];
+    if ([_readTimer respondsToSelector:@selector(setTolerance:)]) {
+        //[_readTimer setTolerance:2.0];
+    }
+    [_readTimer fire];
+}
+
+-(IBAction)enableMinSpeed:(id)sender
+{
+    BOOL enable = [sender state] == NSOnState;
+    [sliderCell setHidden:!enable];
+    [rpmCell setHidden:!enable];
+    [[NSUserDefaults standardUserDefaults] setValue:@(enable) forKey:@"EnableControlMinspeed"];
 }
 
 -(void)displayDonationMessage
@@ -388,7 +413,7 @@ NSUserDefaults *defaults;
         
         NSNumberFormatter *nc=[[NSNumberFormatter alloc] init];
         //avoid jumping in menu bar
-        [nc setFormat:@"000;000;-000"];
+        [nc setFormat:@"000;----;===="];
         
         fan = [NSString stringWithFormat:@"%@rpm",[nc stringForObjectValue:[NSNumber numberWithFloat:selectedRpm]]];
     }
@@ -526,9 +551,13 @@ NSUserDefaults *defaults;
 	int i;
 	[FanControl setRights];
 	[FavoritesController setSelectionIndex:cIndex];
-	for (i=0;i<[[FavoritesController arrangedObjects][cIndex][@"FanData"] count];i++) {
-		[smcWrapper setKey_external:[NSString stringWithFormat:@"F%dMn",i] value:[[FanController arrangedObjects][i][@"selspeed"] tohex]];
-	}
+    if ([[defaults objectForKey:@"EnableControlMinspeed"] boolValue])
+    {
+        NSLog(@"Setting Minspeed");
+        for (i=0;i<[[FavoritesController arrangedObjects][cIndex][@"FanData"] count];i++) {
+            [smcWrapper setKey_external:[NSString stringWithFormat:@"F%dMn",i] value:[[FanController arrangedObjects][i][@"selspeed"] tohex]];
+        }
+    }
 	NSMenu *submenu = [[NSMenu alloc] init];
 	
 	for(i=0;i<[[FavoritesController arrangedObjects] count];i++){
@@ -603,6 +632,7 @@ NSUserDefaults *defaults;
 			[[FanController arrangedObjects][i] setValue:@NO forKey:@"menu"];
 		}	
 	}
+    [self readFanData:nil];
 }
 
 // Called when user clicks on smcFanControl status bar item
@@ -695,6 +725,11 @@ NSUserDefaults *defaults;
 			[[FanController arrangedObjects][0] unbind:@"selspeed"];
 		}
 	}	
+}
+
+- (IBAction)sliderUpdateIntervalChange:(id)sender{
+    [[NSUserDefaults standardUserDefaults] setValue:@([sliderUpdateInterval floatValue]) forKey:@"UpdateInterval"];
+    [self updateTimer];
 }
 
 
